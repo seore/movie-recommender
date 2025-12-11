@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cine Recommender</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/frontend/styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="logo">🎬 Cine Recommender</h1>
+      <p class="subtitle">Hybrid movie recommendations using content + collaborative filtering</p>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="controls-card">
+      <h2>Select a base movie</h2>
+      <p class="hint">
+        Choose a movie and we’ll recommend similar titles based on genres, descriptions, and what similar users liked.
+      </p>
+
+      <div class="form-row">
+        <label for="movieSelect">Movie</label>
+        <select id="movieSelect">
+          <option value="">Loading movies...</option>
+        </select>
+      </div>
+
+      <div class="form-row-inline">
+        <div class="form-field">
+          <label for="topK">Number of recommendations</label>
+          <input type="number" id="topK" min="1" max="50" value="10">
+        </div>
+
+        <div class="form-field">
+          <label for="alpha">Hybrid weight (α)</label>
+          <div class="slider-row">
+            <input type="range" id="alpha" min="0" max="1" step="0.1" value="0.5">
+            <span id="alphaValue">0.5</span>
+          </div>
+          <div class="hint small">
+            0 = content only, 1 = collaborative only
+          </div>
+        </div>
+      </div>
+
+      <button id="recommendBtn" class="primary-btn">
+        Get Recommendations
+      </button>
+
+      <p id="statusMessage" class="status"></p>
+    </section>
+
+    <section class="results-section">
+      <h2>Recommendations</h2>
+      <p id="baseMovieTitle" class="base-movie"></p>
+      <div id="resultsGrid" class="results-grid">
+        <!-- Recommendation cards go here -->
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Backend: FastAPI · Model: Hybrid recommender ·
+      <span class="muted">Toy project for portfolio</span>
+    </p>
+  </footer>
+
+  <script src="/frontend/app.js"></script>
+</body>
+</html>
