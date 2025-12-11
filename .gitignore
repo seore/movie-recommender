@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+.venv/
+venv/
+backend/.env
+
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb~
+
+# Node / frontend
+node_modules/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Data (optional: keep raw data out of git)
+backend/data/*.csv
+!backend/data/.gitkeep
