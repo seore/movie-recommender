@@ -236,13 +236,45 @@ input[type="range"] {
 }
 
 .movie-card {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
   background: radial-gradient(circle at top, rgba(15, 23, 42, 0.99), rgba(15, 23, 42, 0.95));
   border-radius: 14px;
-  padding: 10px 12px 11px;
+  padding: 10px 12px;
   border: 1px solid rgba(31, 41, 55, 0.9);
   box-shadow: var(--shadow-subtle);
   position: relative;
   overflow: hidden;
+}
+
+.movie-poster-wrapper {
+  flex: 0 0 70px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.movie-poster-wrapper.no-poster {
+  /* If no poster, show a subtle placeholder */
+  background: radial-gradient(circle at top, rgba(148, 163, 184, 0.2), rgba(15, 23, 42, 0.9));
+}
+
+.movie-poster {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+.movie-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .movie-card::before {

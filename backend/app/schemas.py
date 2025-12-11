@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 
 class RecommendRequest(BaseModel):
@@ -28,7 +28,7 @@ class RecommendResponse(BaseModel):
 class MovieSummary(BaseModel):
     movie_id: int
     title: str
-    genres: str | None = None
+    genres: Optional[str] = None
 
 
 class MovieListResponse(BaseModel):

@@ -1,5 +1,9 @@
+import os
+import httpx
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from .schemas import (
     RecommendRequest,
@@ -10,6 +14,11 @@ from .schemas import (
 )
 from .recommender import engine
 
+load_dotenv()
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+TMDB_IMG_BASE = "https://image.tmdb.org/t/p/w342"
+TMDB_BASE_URL = "https://api.themoviedb.org/3"
+
 
 app = FastAPI(
     title="Cine Recommender API",
@@ -17,48 +26,40 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow all origins for dev; tighten this in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # ok for dev; restrict in prod
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 @app.on_event("startup")
-def startup_event():
-    """
-    Initialise the recommender on startup so first request is fast.
-    """
+def on_startup() -> None:
     try:
         engine.init()
     except Exception as e:
-        # You can log here with logging module
-        print(f"[ERROR] Failed to initialise recommender: {e}")
+        print(f"[ERROR] Failed to initialise engine: {e}")
 
 
 @app.get("/health", tags=["meta"])
-def health_check():
+def health():
     return {"status": "ok"}
 
 
 @app.get("/movies", response_model=MovieListResponse, tags=["movies"])
-def list_movies(limit: int = 20):
-    """
-    Return a small random set of movies for the frontend to show
-    as examples / dropdown options.
-    """
+def get_movies(limit: int = 20):
     try:
-        engine.init()
+        movies = engine.list_sample_movies(limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    movies = engine.list_sample_movies(limit)
     return MovieListResponse(
         movies=[
             MovieSummary(
-                movie_id=m["movie_id"], title=m["title"], genres=m.get("genres")
+                movie_id=m["movie_id"],
+                title=m["title"],
+                genres=m.get("genres"),
             )
             for m in movies
         ]
@@ -66,30 +67,24 @@ def list_movies(limit: int = 20):
 
 
 @app.post("/recommend", response_model=RecommendResponse, tags=["recommend"])
-def recommend_movies(payload: RecommendRequest):
-    """
-    Recommend movies given a base movie ID, using a hybrid of content-based
-    similarity and collaborative filtering.
-    """
+def recommend(payload: RecommendRequest):
     try:
-        engine.init()
         result = engine.recommend(
             movie_id=payload.movie_id,
             top_k=payload.top_k,
             alpha=payload.alpha,
         )
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except FileNotFoundError as fe:
-        raise HTTPException(status_code=500, detail=f"Data file missing: {fe}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=f"Missing file: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     if not result.recommendations:
         raise HTTPException(
             status_code=404,
-            detail=f"No recommendations found for movie_id={payload.movie_id}. "
-                   f"It might not exist in the dataset or has no similar movies.",
+            detail=f"No recommendations found for movie_id={payload.movie_id}.",
         )
 
     return RecommendResponse(
@@ -97,10 +92,45 @@ def recommend_movies(payload: RecommendRequest):
         base_title=result.base_title,
         recommendations=[
             Recommendation(
-                movie_id=rec["movie_id"],
-                title=rec["title"],
-                score=rec["score"],
+                movie_id=r["movie_id"],
+                title=r["title"],
+                score=r["score"],
             )
-            for rec in result.recommendations
+            for r in result.recommendations
         ],
     )
+
+@app.get("/poster", tags=["poster"])
+async def get_poster(title: str, year: int | None = None):
+    if not TMDB_API_KEY:
+        return {"poster_url": None}
+
+    params = {
+        "api_key": TMDB_API_KEY,
+        "query": title,
+    }
+    if year:
+        params["year"] = year
+
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.get(
+                f"{TMDB_BASE_URL}/search/movie",
+                params=params,
+                timeout=10.0,
+            )
+        res.raise_for_status()
+        data = res.json()
+    except Exception as e:
+        print(f"[ERROR] TMDB request failed: {e}")
+        return {"poster_url": None}
+
+    results = data.get("results") or []
+    if not results:
+        return {"poster_url": None}
+
+    poster_path = results[0].get("poster_path")
+    if not poster_path:
+        return {"poster_url": None}
+
+    return {"poster_url": f"{TMDB_IMG_BASE}{poster_path}"}

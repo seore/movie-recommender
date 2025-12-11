@@ -1,4 +1,3 @@
-// Change this if your backend runs elsewhere
 const API_BASE_URL = "http://localhost:8000";
 
 const movieSelect = document.getElementById("movieSelect");
@@ -10,6 +9,34 @@ const topKInput = document.getElementById("topK");
 const alphaSlider = document.getElementById("alpha");
 const alphaValue = document.getElementById("alphaValue");
 
+const posterCache = new Map();
+
+function splitTitleAndYear(fullTitle) {
+  const match = fullTitle.match(/^(.*)\s+\((\d{4})\)$/);
+  if (!match) return { title: fullTitle, year: null };
+  return { title: match[1], year: match[2] };
+}
+
+async function fetchPosterUrl(fullTitle) {
+  const { title, year } = splitTitleAndYear(fullTitle);
+
+  const params = new URLSearchParams({ title });
+  if (year) params.append("year", year);
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/poster?${params.toString()}`);
+    if (!res.ok) {
+      throw new Error("Poster endpoint error");
+    }
+    const data = await res.json();
+    return data.poster_url || null;
+  } catch (err) {
+    console.warn("Poster fetch failed:", fullTitle, err);
+    return null;
+  }
+}
+
+
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
@@ -17,17 +44,16 @@ async function fetchJSON(url, options = {}) {
   });
 
   if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(detail || `Request failed with status ${res.status}`);
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
   }
 
   return res.json();
 }
 
-function setStatus(message, type = "info") {
-  statusMessage.textContent = message || "";
+function setStatus(msg, type = "info") {
+  statusMessage.textContent = msg || "";
   statusMessage.classList.remove("error", "success");
-
   if (type === "error") statusMessage.classList.add("error");
   if (type === "success") statusMessage.classList.add("success");
 }
@@ -57,7 +83,7 @@ function renderMoviesDropdown(movies) {
   movies.forEach((m) => {
     const opt = document.createElement("option");
     opt.value = m.movie_id;
-    opt.textContent = `${m.title} ${m.genres ? `(${m.genres})` : ""}`;
+    opt.textContent = `${m.title}${m.genres ? ` (${m.genres})` : ""}`;
     movieSelect.appendChild(opt);
   });
 }
@@ -76,6 +102,18 @@ function renderRecommendations(baseTitle, recommendations) {
     const card = document.createElement("div");
     card.className = "movie-card";
 
+    const posterWrapper = document.createElement("div");
+    posterWrapper.className = "movie-poster-wrapper";
+
+    const posterImg = document.createElement("img");
+    posterImg.className = "movie-poster";
+    posterImg.alt = rec.title;
+    posterImg.loading = "lazy";
+    posterWrapper.appendChild(posterImg);
+
+    const content = document.createElement("div");
+    content.className = "movie-content";
+
     const title = document.createElement("h3");
     title.textContent = rec.title;
 
@@ -83,9 +121,21 @@ function renderRecommendations(baseTitle, recommendations) {
     score.className = "score";
     score.textContent = `Similarity score: ${rec.score.toFixed(3)}`;
 
-    card.appendChild(title);
-    card.appendChild(score);
+    content.appendChild(title);
+    content.appendChild(score);
+
+    card.appendChild(posterWrapper);
+    card.appendChild(content);
     resultsGrid.appendChild(card);
+
+    // async load poster, update when it arrives
+    fetchPosterUrl(rec.title).then((url) => {
+      if (url) {
+        posterImg.src = url;
+      } else {
+        posterWrapper.classList.add("no-poster"); // for special styling if needed
+      }
+    });
   });
 }
 
@@ -98,7 +148,7 @@ async function loadMovies() {
   } catch (err) {
     console.error(err);
     renderMoviesDropdown([]);
-    setStatus("Failed to load movies. Check that the backend is running.", "error");
+    setStatus("Failed to load movies. Is the backend running?", "error");
   }
 }
 
@@ -134,17 +184,13 @@ async function getRecommendations() {
     setStatus(`Found ${data.recommendations.length} recommendations.`, "success");
   } catch (err) {
     console.error(err);
-    setStatus(
-      err.message || "Something went wrong while fetching recommendations.",
-      "error"
-    );
+    setStatus(err.message || "Failed to fetch recommendations.", "error");
   } finally {
     recommendBtn.disabled = false;
   }
 }
 
 function initUI() {
-  // Alpha slider display
   alphaValue.textContent = alphaSlider.value;
   alphaSlider.addEventListener("input", () => {
     alphaValue.textContent = alphaSlider.value;
@@ -161,7 +207,4 @@ async function initApp() {
   await loadMovies();
 }
 
-// Init when DOM is ready
-document.addEventListener("DOMContentLoaded", () => {
-  initApp();
-});
+document.addEventListener("DOMContentLoaded", initApp);
