@@ -11,7 +11,11 @@ DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = BASE_DIR / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
-MOVIES_PATH = DATA_DIR / "movies.csv"
+# MOVIES_PATH = DATA_DIR / "movies.csv"
+# RATINGS_PATH = DATA_DIR / "ratings.csv"
+
+MOVIES_COMBINED_PATH = DATA_DIR / "movies_combined.csv"
+MOVIES_PATH = MOVIES_COMBINED_PATH if MOVIES_COMBINED_PATH.exists() else (DATA_DIR / "movies.csv")
 RATINGS_PATH = DATA_DIR / "ratings.csv"
 
 CONTENT_VECTORIZER_PATH = MODELS_DIR / "content_vectorizer.pkl"
