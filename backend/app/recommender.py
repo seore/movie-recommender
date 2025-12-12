@@ -134,6 +134,53 @@ class RecommenderEngine:
             }
             for _, row in sample.iterrows()
         ]
+    
+    def explore_movies(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        genre_substring: str | None = None,
+        min_rating: float | None = None,
+    ) -> dict:
+        if not self._initialized:
+            self.init()
+
+        df = self.movies.copy()
+
+        if genre_substring:
+            g = genre_substring.lower()
+            if "genres" in df.columns:
+                df = df[df["genres"].str.lower().str.contains(g, na=False)]
+
+        if min_rating is not None and "vote_average" in df.columns:
+            df = df[df["vote_average"].fillna(0) >= float(min_rating)]
+
+        total = len(df)
+        page = max(1, page)
+        page_size = max(1, min(page_size, 100))
+
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_df = df.iloc[start:end]
+
+        movies = []
+        for _, row in page_df.iterrows():
+            movies.append(
+                {
+                    "movie_id": int(row["movieId"]),
+                    "title": str(row["title"]),
+                    "genres": None if "genres" not in row or pd.isna(row["genres"]) else str(row["genres"]),
+                    "vote_average": float(row["vote_average"]) if "vote_average" in df.columns and not pd.isna(row["vote_average"]) else None,
+                }
+            )
+
+        return {
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "movies": movies,
+        }
+
 
     # ---------- LOADING ----------
 
@@ -304,8 +351,6 @@ class RecommenderEngine:
             }
             for _, row in results.iterrows()
         ]
-
-
 
 
 # singleton engine used by main.py

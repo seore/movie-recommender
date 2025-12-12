@@ -205,3 +205,22 @@ def search_movies(query: str, limit: int = 10):
             for m in movies
         ]
     }
+
+@app.get("/explore_movies", tags=["movies"])
+def explore_movies(
+    page: int = 1,
+    page_size: int = 20,
+    genre: str | None = None,
+    min_rating: float | None = None,
+):
+    try:
+        result = engine.explore_movies(
+            page=page,
+            page_size=page_size,
+            genre_substring=genre,
+            min_rating=min_rating,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
+

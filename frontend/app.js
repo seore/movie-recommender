@@ -20,12 +20,19 @@ const modalOverview = document.getElementById("modalOverview");
 const movieSearchInput = document.getElementById("movieSearchInput");
 const searchSuggestionsContainer = document.getElementById("searchSuggestions");
 
+const exploreGenreInput = document.getElementById("exploreGenre");
+const exploreMinRatingInput = document.getElementById("exploreMinRating");
+const exploreGrid = document.getElementById("exploreGrid");
+const exploreApplyBtn = document.getElementById("exploreApplyFilters");
+const exploreLoadMoreBtn = document.getElementById("exploreLoadMore");
+
+let explorePage = 1;
+let exploreHasMore = true;
 let searchTimeout = null;
 let currentMode = "hybrid";
 const favorites = new Set(JSON.parse(localStorage.getItem("favorites") || "[]"));
 
 // --- helpers ---
-
 async function fetchJSON(url, options = {}) {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
@@ -137,9 +144,89 @@ async function handleSearchInput() {
   }
 }
 
+function clearExplore() {
+  exploreGrid.innerHTML = "";
+  explorePage = 1;
+  exploreHasMore = true;
+}
+
+function renderExploreMovies(movies) {
+  movies.forEach((m) => {
+    const card = document.createElement("div");
+    card.className = "movie-card";
+
+    const posterWrapper = document.createElement("div");
+    posterWrapper.className = "movie-poster-wrapper skeleton";
+
+    const posterImg = document.createElement("img");
+    posterImg.className = "movie-poster";
+    posterImg.alt = m.title;
+    posterImg.loading = "lazy";
+    posterWrapper.appendChild(posterImg);
+
+    const content = document.createElement("div");
+    content.className = "movie-content";
+
+    const title = document.createElement("h3");
+    title.textContent = m.title;
+
+    const meta = document.createElement("div");
+    meta.className = "score";
+    const ratingText =
+      m.vote_average != null ? `Rating: ${m.vote_average.toFixed(1)}` : "Rating: N/A";
+    meta.textContent = `${ratingText}${m.genres ? ` • ${m.genres}` : ""}`;
+
+    content.appendChild(title);
+    content.appendChild(meta);
+
+    card.appendChild(posterWrapper);
+    card.appendChild(content);
+    exploreGrid.appendChild(card);
+
+    // Click opens modal
+    card.addEventListener("click", async () => {
+      await openMovieModal(m.title);
+    });
+
+    // load poster
+    fetchPosterUrl(m.title).then((url) => {
+      posterWrapper.classList.remove("skeleton");
+      if (url) posterImg.src = url;
+    });
+  });
+}
+
+async function loadExplorePage() {
+  if (!exploreHasMore) return;
+
+  const genre = exploreGenreInput.value.trim();
+  const minRatingValue = exploreMinRatingInput.value.trim();
+  const params = new URLSearchParams({
+    page: explorePage.toString(),
+    page_size: "20",
+  });
+  if (genre) params.append("genre", genre);
+  if (minRatingValue) params.append("min_rating", minRatingValue);
+
+  try {
+    const data = await fetchJSON(
+      `${API_BASE_URL}/explore_movies?${params.toString()}`
+    );
+    renderExploreMovies(data.movies);
+    const shown = explorePage * 20;
+    if (shown >= data.total || data.movies.length === 0) {
+      exploreHasMore = false;
+      exploreLoadMoreBtn.disabled = true;
+      exploreLoadMoreBtn.textContent = "No more movies";
+    } else {
+      explorePage += 1;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
 
 // --- favorites ---
-
 function saveFavorites() {
   localStorage.setItem("favorites", JSON.stringify([...favorites]));
 }
@@ -154,7 +241,6 @@ function toggleFavorite(movieId) {
 }
 
 // --- UI rendering ---
-
 function renderMoviesDropdown(movies) {
   movieSelect.innerHTML = "";
 
@@ -257,8 +343,7 @@ function renderRecommendations(baseTitle, recommendations) {
   });
 }
 
-// --- Modal ---
-
+// --- Modals ---
 async function openMovieModal(fullTitle) {
   modalTitle.textContent = fullTitle;
   modalMeta.textContent = "Loading details…";
@@ -289,7 +374,6 @@ function closeModal() {
 }
 
 // --- data flows ---
-
 async function loadMovies() {
   try {
     setStatus("Loading movies…");
@@ -343,7 +427,6 @@ async function getRecommendations() {
 }
 
 // --- init ---
-
 function initUI() {
   alphaValue.textContent = alphaSlider.value;
   alphaSlider.addEventListener("input", () => {
@@ -384,11 +467,26 @@ function initUI() {
     clearSuggestions();
       }
   });
+
+  // explore options
+    exploreApplyBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    clearExplore();
+    exploreLoadMoreBtn.disabled = false;
+    exploreLoadMoreBtn.textContent = "Load more";
+    loadExplorePage();
+  });
+
+  exploreLoadMoreBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    loadExplorePage();
+  });
 }
 
 async function initApp() {
   initUI();
   await loadMovies();
+  loadExplorePage();
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
